@@ -1,4 +1,6 @@
 {
+  "name":"heimdall.js",
+  "version": "0.0.1",
   "scripts": {
     "heimdall.js": "ts-node src/cli.ts"
   },
