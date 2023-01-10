@@ -1,4 +1,4 @@
-import { ResponsePacket, ResponseType } from "./ResponsePacket";
+import { ResponsePacket, ResponseType } from "./ResponsePacket.js";
 
 export class SessionSetupResponse extends ResponsePacket {
     result: number|null = null

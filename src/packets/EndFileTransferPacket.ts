@@ -1,4 +1,4 @@
-import { FileTransferPacket, FileTransferRequest } from "./FileTransferPacket";
+import { FileTransferPacket, FileTransferRequest } from "./FileTransferPacket.js";
 
 export enum EndFileTransferDestination {
     Phone	= 0x00,

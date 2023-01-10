@@ -1,4 +1,4 @@
-import { PitFilePacket, PitFileRequest } from "./PitFilePacket";
+import { PitFilePacket, PitFileRequest } from "./PitFilePacket.js";
 
 export class DumpPartPitFilePacket extends PitFilePacket {
     partIndex: number

@@ -87,7 +87,7 @@ interface Pit {
     entries: PitEntry[]
 }
 
-export function unpackPit(buf: Buffer|ArrayBuffer) {
+export function unpackPit(buf: Uint8Array) {
     const data = new Uint8Array(buf)
     if (UnpackInteger(data, 0) != PitDataConsts.FileIdentifier) throw new Error("pit doesn't start with magic header")
     

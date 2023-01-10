@@ -1,4 +1,4 @@
-import { InboundPacket } from "./InboundPacket";
+import { InboundPacket } from "./InboundPacket.js";
 
 export class ReceiveFilePartPacket extends InboundPacket {
     static dataSize = 500

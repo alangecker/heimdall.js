@@ -1,4 +1,4 @@
-import { FileTransferPacket, FileTransferRequest } from "./FileTransferPacket";
+import { FileTransferPacket, FileTransferRequest } from "./FileTransferPacket.js";
 export class FlashPartFileTransferPacket extends FileTransferPacket {
     constructor(
         readonly sequenceByteCount: number,

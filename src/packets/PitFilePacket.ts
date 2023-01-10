@@ -1,4 +1,4 @@
-import { ControlPacket, ControlType } from "./ControlPacket";
+import { ControlPacket, ControlType } from "./ControlPacket.js";
 
 export enum PitFileRequest {
     Flash			= 0x00,

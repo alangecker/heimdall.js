@@ -1,9 +1,9 @@
-import { OutboundPacket } from "./OutboundPacket";
+import { OutboundPacket } from "./OutboundPacket.js";
 
 export class SendFilePartPacket extends OutboundPacket {
-    constructor(data: ArrayBuffer) {
+    constructor(data: Uint8Array) {
         super(data.byteLength);
-        this.data = new Uint8Array(data)
+        this.data = data
     }
 
     Pack() {}

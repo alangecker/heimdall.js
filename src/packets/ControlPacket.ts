@@ -1,4 +1,4 @@
-import { OutboundPacket } from "./OutboundPacket";
+import { OutboundPacket } from "./OutboundPacket.js";
 
 export enum ControlType {
     Session = 0x64,

@@ -1,4 +1,4 @@
-import type { WebUSBDevice } from 'usb';
+// import type { USBDevice } from 'usb';
 import {
     BeginSessionPacket,
     FilePartSizePacket,
@@ -20,14 +20,14 @@ import {
     SendFilePartResponse,
     EndPhoneFileTransferPacket,
     EndSessionPacket, EndSessionRequest
-} from './packets'
-import { calculateBatches, concatUint8Array } from './utils'
-import { BinaryType, unpackPit } from './libpit';
+} from './packets/index.js'
+import { calculateBatches, concatUint8Array } from './utils.js'
+import { BinaryType, unpackPit } from './libpit.js'
 
 const USB_CLASS_CDC_DATA = 0x0a;
 
 
-type BinaryData = ArrayBuffer//|Buffer
+type BinaryData = Uint8Array
 
 enum kEmptyTransfer {
     None = 0,
@@ -36,28 +36,36 @@ enum kEmptyTransfer {
     BeforeAndAfter = Before | After
 }
 export class OdinDevice {
-    device: WebUSBDevice
+    device: USBDevice
     protocolInitalized: boolean
-    private endpointNumber: number = -1
+    private endpointIn: USBEndpoint
+    private endpointOut: USBEndpoint
 
     private fileTransferSequenceMaxLength = 800;
 	private fileTransferPacketSize = 131072;
 
-    constructor(device: WebUSBDevice) {
+    constructor(device: USBDevice) {
         this.device = device
         this.protocolInitalized = false
     }
 
-    async _initalizeProtocol() {
-        const probePacket = new TextEncoder().encode("ODIN");
-        await this.device.transferOut(this.endpointNumber, probePacket);
+    
 
-        const respPacket = await this.device.transferIn(this.endpointNumber, 4);
+    private async initalizeProtocol() {
+        const probePacket = new TextEncoder().encode("ODIN");
+        await this.device.transferOut(this.endpointOut.endpointNumber, probePacket);
+
+        const respPacket = await this.device.transferIn(this.endpointIn.endpointNumber, 4);
         const response = new TextDecoder().decode(respPacket.data);
         if (response !== "LOKE") {
             throw new Error(`Unexpected Response\nExpected: "LOKE"\nReceived: "${response}"`)
         }
         this.protocolInitalized = true;
+    }
+
+    async setEndpoints(endpointIn: USBEndpoint, endpointOut: USBEndpoint) {
+        this.endpointIn = endpointIn
+        this.endpointOut = endpointOut
     }
 
     async initialise() {
@@ -82,7 +90,8 @@ export class OdinDevice {
                     && inf.alternates[j].interfaceClass == USB_CLASS_CDC_DATA) {
                         interfaceIndex = i;
                         altSettingIndex = j;
-                        this.endpointNumber = inf.alternates[j].endpoints[0].endpointNumber
+                        this.endpointIn = inf.alternates[j].endpoints[0]
+                        this.endpointOut = inf.alternates[j].endpoints[0]
                     }
             }
         }
@@ -93,8 +102,7 @@ export class OdinDevice {
 
         await this.device.claimInterface(interfaceIndex);
         await this.device.selectAlternateInterface(interfaceIndex, altSettingIndex);
-
-        await this._initalizeProtocol();
+        await this.initalizeProtocol()
     }
 
 
@@ -102,23 +110,22 @@ export class OdinDevice {
         packet.Pack()
 
         if (flags & kEmptyTransfer.Before) {
-            await this.device.transferOut(this.endpointNumber, new Uint8Array([]))
+            await this.device.transferOut(this.endpointOut.endpointNumber, new Uint8Array([]))
         }
-        const res = await this.device.transferOut(this.endpointNumber, packet.Buffer());
+        const res = await this.device.transferOut(this.endpointOut.endpointNumber, packet.Buffer());
         if(res.status != "ok") {
             throw new Error(`error while sending ${packet.constructor.name}`)
         }
 
         if (flags & kEmptyTransfer.After) {
-            await this.device.transferOut(this.endpointNumber, new Uint8Array([]))
+            await this.device.transferOut(this.endpointOut.endpointNumber, new Uint8Array([]))
         }
     }
     async receivePacket<T extends InboundPacket>(packet: T, flags: kEmptyTransfer = kEmptyTransfer.None): Promise<T> {
         if (flags & kEmptyTransfer.Before) {
-            await this.device.transferIn(this.endpointNumber, 0)
+            await this.device.transferIn(this.endpointIn.endpointNumber, 0)
         }
-
-        let responsePacket = await this.device.transferIn(this.endpointNumber, packet.size);
+        let responsePacket = await this.device.transferIn(this.endpointIn.endpointNumber, packet.size);
         if(!responsePacket.data) throw new Error(`responsePacket is missing data attribute. (status=${responsePacket.status}`)
         packet.data = new Uint8Array(responsePacket.data.buffer);
         if(!packet.Unpack()) {
@@ -127,20 +134,20 @@ export class OdinDevice {
         }
 
         if (flags & kEmptyTransfer.After) {
-            await this.device.transferIn(this.endpointNumber, 0)
+            await this.device.transferIn(this.endpointIn.endpointNumber, 0)
         }
         return packet;
     }
 
     async beginSession() {
-        console.log('Beginning session...')
+        // console.log('Beginning session...')
         await this.sendPacket(new BeginSessionPacket());
         const resp = await this.receivePacket(new SessionSetupResponse());
         const deviceDefaultPacketSize = resp.result
 
         if (deviceDefaultPacketSize != 0) // 0 means changing the packet size is not supported.
         {
-            console.log('changing file size')
+            // console.log('changing file size')
             this.fileTransferPacketSize = 1048576; // 1 MiB
             this.fileTransferSequenceMaxLength = 30
 
@@ -153,15 +160,19 @@ export class OdinDevice {
         }
     }
     async endSession() {
-        console.log("Ending session...");
+        // console.log("Ending session...");
 
         await this.sendPacket(new EndSessionPacket(EndSessionRequest.EndSession))
         await this.receivePacket(new ResponsePacket(ResponseType.EndSession))
     }
     async reboot() {
-        console.log("Rebooting device...\n");
-        await this.sendPacket(new EndSessionPacket(1))
+        // console.log("Rebooting device...\n");
+        await this.sendPacket(new EndSessionPacket(EndSessionRequest.RebootDevice))
         await this.receivePacket(new ResponsePacket(ResponseType.EndSession))
+    }
+    async shutdown() {
+        // console.log("shutdown device (if possible)...\n");
+        await this.sendPacket(new EndSessionPacket(EndSessionRequest.Shutdown))
     }
 
     async enableTFlash() {
@@ -190,14 +201,14 @@ export class OdinDevice {
             const pitEntry = pit.entries.find(e => e.partitionName == name)
             if(!pitEntry) throw new Error(`Partition ${name} specified, but could not be found in phone's partition table`)
             const file = partitionFiles[name]
-            console.log(`Uploading ${pitEntry.partitionName}...`)
+            // console.log(`Uploading ${pitEntry.partitionName}...`)
             if(pitEntry.binaryType === BinaryType.CommunicationProcessor) { // Modem
                 await this.sendFile(file, EndFileTransferDestination.Modem, pitEntry.deviceType)
     
             } else {
                 await this.sendFile(file, EndFileTransferDestination.Phone, pitEntry.deviceType, pitEntry.identifier)
             }
-            console.log(`${pitEntry.partitionName} upload successful\n`)
+            // console.log(`${pitEntry.partitionName} upload successful\n`)
         }
     }
     private async sendFile(file: BinaryData, destination: number, deviceType: number, fileIdentifier: number = 0xFFFFFFFF) {
@@ -245,7 +256,7 @@ export class OdinDevice {
     }
 
     async receivePitFile() {
-        console.log("Downloading device's PIT file...\n");
+        // console.log("Downloading device's PIT file...\n");
 
         await this.sendPacket(new PitFilePacket(PitFileRequest.Dump))
         const resp = await this.receivePacket(new PitFileResponse())
@@ -267,7 +278,7 @@ export class OdinDevice {
         await this.sendPacket(new PitFilePacket(PitFileRequest.EndTransfer))        
         await this.receivePacket(new PitFileResponse())
 
-        console.log("PIT file download successful.");
+        // console.log("PIT file download successful.");
         return concatUint8Array(bufs)
     }
 }

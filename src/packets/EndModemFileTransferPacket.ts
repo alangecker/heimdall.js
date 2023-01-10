@@ -1,4 +1,4 @@
-import { EndFileTransferDestination, EndFileTransferPacket } from "./EndFileTransferPacket";
+import { EndFileTransferDestination, EndFileTransferPacket } from "./EndFileTransferPacket.js";
 
 
 export class EndModemFileTransferPacket extends EndFileTransferPacket {

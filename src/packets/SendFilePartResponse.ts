@@ -1,4 +1,4 @@
-import { ResponsePacket, ResponseType } from "./ResponsePacket";
+import { ResponsePacket, ResponseType } from "./ResponsePacket.js";
 
 export class SendFilePartResponse extends ResponsePacket {
     partIndex: number = -1
