@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "heimdall.js": "ts-node src/cli.ts"
+    "heimdall.js": "ts-node --esm src/cli.ts"
   },
   "devDependencies": {
     "@types/node": "^18.11.7",

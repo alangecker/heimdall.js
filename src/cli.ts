@@ -1,5 +1,5 @@
 import { WebUSBDevice, getDeviceList } from 'usb';
-import { OdinDevice } from './OdinDevice'
+import { OdinDevice } from './OdinDevice.js'
 import fs from 'fs'
 
 
