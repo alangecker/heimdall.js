@@ -90,8 +90,10 @@ export class OdinDevice {
                     && inf.alternates[j].interfaceClass == USB_CLASS_CDC_DATA) {
                         interfaceIndex = i;
                         altSettingIndex = j;
-                        this.endpointIn = inf.alternates[j].endpoints[0]
-                        this.endpointOut = inf.alternates[j].endpoints[0]
+                        for(let endpoint of inf.alternates[j].endpoints) {
+                            if(endpoint.direction == 'in') this.endpointIn = endpoint
+                            else this.endpointOut = endpoint
+                        }
                     }
             }
         }
