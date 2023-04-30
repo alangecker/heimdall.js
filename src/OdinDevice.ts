@@ -19,10 +19,14 @@ import {
     OutboundPacket,
     SendFilePartResponse,
     EndPhoneFileTransferPacket,
-    EndSessionPacket, EndSessionRequest
+    EndSessionPacket,
+    EndSessionRequest,
+    DeviceInfoResponse,
+    DeviceInfoCommand,
+    DeviceInfoPacket
 } from './packets/index.js'
-import { calculateBatches, concatUint8Array } from './utils.js'
-import { BinaryType, unpackPit } from './libpit.js'
+import { calculateBatches, concatUint8Array, parseDeviceInfo, promiseWithTimeout } from './utils.js'
+import { BinaryType, DeviceType, unpackPit } from './libpit.js'
 
 const USB_CLASS_CDC_DATA = 0x0a;
 
@@ -35,6 +39,7 @@ enum kEmptyTransfer {
     After = 1 << 1,
     BeforeAndAfter = Before | After
 }
+
 export class OdinDevice {
     device: USBDevice
     protocolInitalized: boolean
@@ -48,6 +53,9 @@ export class OdinDevice {
         this.device = device
         this.protocolInitalized = false
     }
+
+    protocolVersion: number = 0
+    modelName: string = ''
 
     
 
@@ -145,6 +153,7 @@ export class OdinDevice {
         // console.log('Beginning session...')
         await this.sendPacket(new BeginSessionPacket());
         const resp = await this.receivePacket(new SessionSetupResponse());
+        this.protocolVersion = resp.protocolVersion
         const deviceDefaultPacketSize = resp.result
 
         if (deviceDefaultPacketSize != 0) // 0 means changing the packet size is not supported.
@@ -159,6 +168,10 @@ export class OdinDevice {
             if (resp.result != 0) {
                 throw new Error(`Unexpected file part size response!\nExpected: 0\nReceived: ${resp.result}\n`);
             }
+        }
+        if(this.protocolVersion >= 3) {
+            const deviceInfo = await this.getDeviceInfo()
+            this.modelName = deviceInfo.modelName
         }
     }
     async endSession() {
@@ -289,5 +302,24 @@ export class OdinDevice {
 
         // console.log("PIT file download successful.");
         return concatUint8Array(bufs)
+    }
+
+    async getDeviceInfo() {
+        await this.sendPacket(new DeviceInfoPacket(DeviceInfoCommand.Start))
+        const resp = await this.receivePacket(new DeviceInfoResponse())
+
+        const bufs: Uint8Array[] = []
+        for (var i = 0; i < Math.floor(resp.fileSize / 500); i++) {
+
+            await this.sendPacket(new DeviceInfoPacket(DeviceInfoCommand.DumpBlock))
+            const resp = await this.receivePacket(new ReceiveFilePartPacket(), kEmptyTransfer.None)
+            bufs.push(resp.data)
+        }
+
+        await this.sendPacket(new DeviceInfoPacket(DeviceInfoCommand.End))
+        await this.receivePacket(new DeviceInfoResponse())
+
+        const data = concatUint8Array(bufs)
+        return parseDeviceInfo(data)
     }
 }

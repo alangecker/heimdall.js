@@ -1,14 +1,14 @@
 
-function UnpackInteger(data: Uint8Array, offset: number) {
+export function UnpackInteger(data: Uint8Array, offset: number) {
     return data[offset] | (data[offset + 1] << 8) |
         (data[offset + 2] << 16) | (data[offset + 3] << 24);
 }
 
-function UnpackShort(data: Uint8Array, offset: number) {
+export function UnpackShort(data: Uint8Array, offset: number) {
     return data[offset] | (data[offset + 1] << 8);
 }
 const textDecoder = new TextDecoder()
-function UnpackString(data: Uint8Array, offset: number) {
+export function UnpackString(data: Uint8Array, offset: number) {
     if(data[offset] == 0x00) return ''
 
     let end = data.length

@@ -1,3 +1,5 @@
+import { UnpackInteger, UnpackString } from "./libpit.js"
+
 export function concatUint8Array (views: Uint8Array[]) {
     let length = 0
     for (const v of views) {
@@ -67,4 +69,63 @@ export function calculateBatches(bytes: number, chunkSize: number, chunksPerBatc
         batches.push(batch)
     }
     return batches
+}
+
+
+export class TimeoutError extends Error {
+    constructor() {
+        super('Promise timed out')
+    }
+}
+export async function promiseWithTimeout<T>(promise: Promise<T>, timeout: number): Promise<T> {
+    let timer: NodeJS.Timeout|number;
+    return await Promise.race([
+        promise.then((res) => {
+            clearTimeout(timer)
+            return res
+        }),
+        new Promise( (_,reject) => {
+            timer = setTimeout(() => {
+                reject(new TimeoutError)
+            }, timeout)
+        }) as any
+    ])
+}
+
+
+export enum DeviceInfoType {
+    MODEL_NAME = 0x00,   // Model's Name
+    SERIAL = 0x01,       // Serial Code
+    OMCSALESCODE = 0x02, // Region Code
+    CARRIERID = 0x03,    // Carrier ID
+}
+export function parseDeviceInfo(data: Uint8Array) {
+    const magic = UnpackInteger(data, 0)
+    if(magic !== 0x12345678) {
+        throw new Error('Expected 0x12345678 magic number, got 0x'+magic.toString(16))
+    }
+    const count = UnpackInteger(data, 4)
+
+    const res = {
+        modelName: '',
+        serial: '',
+    }
+    for(let i=0;i<count;i++) {
+        const type = UnpackInteger(data, 8 + i*12)
+        const offset = UnpackInteger(data, 12 + i*12)
+        const size = UnpackInteger(data, 16 + i*12)
+        const devInfoData = data.slice(offset, offset+size)
+        const str = UnpackString(devInfoData, 8)
+
+        switch(type) {
+            case DeviceInfoType.MODEL_NAME:
+                res.modelName = str
+                break
+            case DeviceInfoType.SERIAL:
+                res.serial = str
+                break
+        }
+    }
+
+    return res
 }

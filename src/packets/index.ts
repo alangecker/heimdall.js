@@ -18,3 +18,5 @@ export { OutboundPacket } from './OutboundPacket.js';
 export { SendFilePartResponse } from './SendFilePartResponse.js';
 export { EndPhoneFileTransferPacket } from './EndPhoneFileTransferPacket.js';
 export { EndSessionPacket, EndSessionRequest } from './EndSessionPacket.js';
+export { DeviceInfoPacket, DeviceInfoCommand } from './DeviceInfoPacket.js';
+export { DeviceInfoResponse } from './DeviceInfoResponse.js';
