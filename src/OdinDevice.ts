@@ -115,22 +115,19 @@ export class OdinDevice {
         await this.initalizeProtocol()
     }
 
-
-    async sendPacket(packet: OutboundPacket, flags: kEmptyTransfer = kEmptyTransfer.None) {
+    async sendPacket(packet: OutboundPacket, flags: kEmptyTransfer = kEmptyTransfer.After) {
         packet.Pack()
 
-        if (flags & kEmptyTransfer.Before) {
-            await this.device.transferOut(this.endpointOut.endpointNumber, new Uint8Array([]))
-        }
         const res = await this.device.transferOut(this.endpointOut.endpointNumber, packet.Buffer());
         if(res.status != "ok") {
             throw new Error(`error while sending ${packet.constructor.name}`)
         }
 
-        if (flags & kEmptyTransfer.After) {
-            await this.device.transferOut(this.endpointOut.endpointNumber, new Uint8Array([]))
+        if (flags & kEmptyTransfer.After && this.protocolVersion >= 3) {
+            await promiseWithTimeout(this.device.transferOut(this.endpointOut.endpointNumber, new Uint8Array([])), 100).catch(() => {})
         }
     }
+    
     async receivePacket<T extends InboundPacket>(packet: T, flags: kEmptyTransfer = kEmptyTransfer.None): Promise<T> {
         if (flags & kEmptyTransfer.Before) {
             await this.device.transferIn(this.endpointIn.endpointNumber, 0)
@@ -141,10 +138,6 @@ export class OdinDevice {
         if(!packet.Unpack()) {
             console.log(packet.data)
             throw new Error(`Error while parsing ${packet.constructor.name}`)
-        }
-
-        if (flags & kEmptyTransfer.After) {
-            await this.device.transferIn(this.endpointIn.endpointNumber, 0)
         }
         return packet;
     }
@@ -269,9 +262,9 @@ export class OdinDevice {
             }
             
             if(destination == EndFileTransferDestination.Phone) {
-                await this.sendPacket(new EndPhoneFileTransferPacket(batch.effectiveSize, 0, deviceType, fileIdentifier, batch.isLast), kEmptyTransfer.Before)
+                await this.sendPacket(new EndPhoneFileTransferPacket(batch.effectiveSize, 0, deviceType, fileIdentifier, batch.isLast), kEmptyTransfer.BeforeAndAfter)
             } else { // destination == EndFileTransferPacket::kDestinationModem
-                await this.sendPacket(new EndModemFileTransferPacket(batch.effectiveSize, 0, deviceType, batch.isLast), kEmptyTransfer.Before)
+                await this.sendPacket(new EndModemFileTransferPacket(batch.effectiveSize, 0, deviceType, batch.isLast), kEmptyTransfer.BeforeAndAfter)
             }
             await this.receivePacket(new ResponsePacket(ResponseType.FileTransfer))
         }
@@ -289,12 +282,24 @@ export class OdinDevice {
 
         for(let i=0;i<transferCount;i++) {
             await this.sendPacket(new DumpPartPitFilePacket(i))
-
-            const receiveEmptyTransferFlags = (i == transferCount - 1) ? kEmptyTransfer.After : kEmptyTransfer.None;
-
-            const resp = await this.receivePacket(new ReceiveFilePartPacket(), receiveEmptyTransferFlags)
-
+            const resp = await this.receivePacket(new ReceiveFilePartPacket(), kEmptyTransfer.None)
+            // console.log('got response')
             bufs.push(new Uint8Array(resp.Buffer()))
+        }
+
+        // some devices require an emptytransfer here
+        // native usb can just send a empty packet without expecting an ack, but with WebUSB
+        // it hangs here if we send an packet which is not expected, so we need to define the
+        // set of devices required it
+        const REQUIRES_ZERO_PACKET = [
+            'SM-G900F'
+        ]
+        
+        if(REQUIRES_ZERO_PACKET.includes(this.modelName)) {
+            // console.log(`receive zero-length packet due to protocol ${this.protocolVersion} >= 3`)
+            await this.device.transferIn(this.endpointIn.endpointNumber, 0)
+        } else {
+            // console.log('no zero-length packet')
         }
     
         await this.sendPacket(new PitFilePacket(PitFileRequest.EndTransfer))        
