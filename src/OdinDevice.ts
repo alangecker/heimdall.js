@@ -204,6 +204,13 @@ export class OdinDevice {
             if(!pitEntry) throw new Error(`Partition ${name} specified, but could not be found in phone's partition table`)
             const file = partitionFiles[name]
             // console.log(`Uploading ${pitEntry.partitionName}...`)
+
+            const blockSize = pitEntry.deviceType == DeviceType.UFS ? 4096 : 512
+            const partitionSize = pitEntry.blockCount * blockSize
+            if(partitionSize > 0 && file.byteLength > partitionSize) {
+                throw new Error(`${name} partition is too small for given file. (image size: ${file.byteLength}, partiton size: ${partitionSize})`)
+            }
+            
             if(pitEntry.binaryType === BinaryType.CommunicationProcessor) { // Modem
                 await this.sendFile(file, EndFileTransferDestination.Modem, pitEntry.deviceType)
     

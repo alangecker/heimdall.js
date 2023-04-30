@@ -40,10 +40,11 @@ export enum BinaryType {
     CommunicationProcessor = 1
 }
 
-enum DeviceType {
+export enum DeviceType {
     OneNand = 0,
     File = 1, // FAT
     MMC = 2,
+    UFS = 8,
     All = 3 // ?
 }
 enum Attribute {
@@ -59,7 +60,7 @@ enum UpdateAttribute {
 export interface PitEntry {
 
     binaryType: number
-    deviceType: number
+    deviceType: DeviceType
     identifier: number
     attributes: number
     updateAttributes: number
@@ -76,14 +77,9 @@ export interface PitEntry {
 }
 
 interface Pit {
-    unknown1?: number
-    unknown2?: number
-    unknown3?: number
-    unknown4?: number
-    unknown5?: number
-    unknown6?: number
-    unknown7?: number
-    unknown8?: number
+    com_tar2: string
+    cpu_bl_id: string
+    luCount: number
     entries: PitEntry[]
 }
 
@@ -95,14 +91,9 @@ export function unpackPit(buf: Uint8Array) {
 
 // entries.resize(entryCount);
 
-    const unknown1 = UnpackInteger(data, 8);
-    const unknown2 = UnpackInteger(data, 12);
-    const unknown3 = UnpackShort(data, 16);
-    const unknown4 = UnpackShort(data, 18);
-    const unknown5 = UnpackShort(data, 20);
-    const unknown6 = UnpackShort(data, 22);
-    const unknown7 = UnpackShort(data, 24);
-    const unknown8 = UnpackShort(data, 26);
+    const comTar2 = UnpackString(data, 8)
+    const cpuBlId = UnpackString(data, 16)
+    const luCount = UnpackShort(data, 24)
 
 // unsigned int integerValue;
 // unsigned int entryOffset;
@@ -130,14 +121,9 @@ export function unpackPit(buf: Uint8Array) {
         entries.push(entry)
     }
     const pit: Pit = {
-        unknown1,
-        unknown2,
-        unknown3,
-        unknown4,
-        unknown5,
-        unknown6,
-        unknown7,
-        unknown8,
+        com_tar2: comTar2,
+        cpu_bl_id: cpuBlId,
+        luCount,
         entries
     }
     return pit

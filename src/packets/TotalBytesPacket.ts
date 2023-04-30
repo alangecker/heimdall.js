@@ -9,5 +9,6 @@ export class TotalBytesPacket extends SessionSetupPacket {
     Pack() {
         super.Pack()
         this.PackInteger(this.dataSize, this.totalBytes);
+        this.PackInteger(this.dataSize, this.totalBytes >> 32);
     }
 }
